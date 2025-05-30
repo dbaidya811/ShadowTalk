@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>ShadowTalk</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/2157/2157645.png" type="image/png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0d1117;
+            background-image: url('https://cdn-icons-png.flaticon.com/512/2157/2157645.png');
+            background-repeat: no-repeat;
+            background-position: center center;
+            background-size: 150px;
+            background-attachment: fixed;
+        }
+        
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #30363d;
+            box-shadow: 0 0 15px #00ffcc33;
+        }
+        
+        .file-link {
+            color: #58a6ff;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body class="text-gray-300 font-mono">
+
+    <div class="max-w-xl mx-auto mt-20 p-6 rounded-lg glass">
+        <h2 class="text-2xl text-center text-blue-400 font-semibold mb-4">ShadowTalk</h2>
+
+        <div class="flex flex-col sm:flex-row gap-2 mb-2">
+            <input id="username" placeholder="Enter username (optional)" class="flex-1 p-2 rounded bg-gray-800 border border-gray-700" />
+            <button onclick="setUsername()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-white">Set Username</button>
+            <button onclick="alert('Coming soon!')" class="bg-yellow-500 hover:bg-yellow-600 px-4 py-2 rounded text-white">Payment</button>
+        </div>
+
+        <div id="userDisplay" class="mb-3 font-bold text-sm text-gray-400">You are: <span id="currentUser">Not set</span></div>
+
+        <ul id="messages" class="border-t border-b border-gray-700 max-h-60 overflow-y-auto text-sm mb-3"></ul>
+
+        <form id="form" onsubmit="sendMessage(event)" class="flex flex-col sm:flex-row gap-2">
+            <input id="input" autocomplete="off" placeholder="Type your message..." class="flex-1 p-2 rounded bg-gray-800 border border-gray-700" />
+            <input type="file" id="fileInput" class="text-sm text-gray-300 file:bg-gray-700 file:border-none file:px-3 file:py-2 file:rounded" />
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white">Send</button>
+        </form>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let currentUser = null;
+
+        function setUsername() {
+            const username = document.getElementById('username').value;
+            socket.emit('set username', username);
+            if (username.trim() !== '') {
+                currentUser = username;
+                document.getElementById('currentUser').innerText = currentUser;
+            }
+        }
+
+        function sendMessage(e) {
+            e.preventDefault();
+            const input = document.getElementById('input');
+            const fileInput = document.getElementById('fileInput');
+
+            if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+                reader.onload = function() {
+                    socket.emit('file upload', {
+                        fileName: file.name,
+                        fileData: reader.result
+                    });
+                };
+                reader.readAsDataURL(file);
+                fileInput.value = '';
+            }
+
+            if (input.value.trim() !== '') {
+                socket.emit('chat message', input.value);
+                input.value = '';
+            }
+        }
+
+        socket.on('chat message', data => {
+            if (!currentUser && socket.id === data.socketId && data.user.startsWith('User_')) {
+                currentUser = data.user;
+                document.getElementById('currentUser').innerText = currentUser;
+            }
+
+            const item = document.createElement('li');
+            item.textContent = `${data.user}: ${data.message}`;
+            document.getElementById('messages').appendChild(item);
+            item.scrollIntoView();
+        });
+
+        socket.on('file upload', data => {
+            const item = document.createElement('li');
+            const link = document.createElement('a');
+            link.href = data.fileData;
+            link.download = data.fileName;
+            link.textContent = `${data.user} sent file: ${data.fileName}`;
+            link.className = 'file-link';
+            item.appendChild(link);
+            document.getElementById('messages').appendChild(item);
+            item.scrollIntoView();
+        });
+    </script>
+
+</body>
+
+</html>
